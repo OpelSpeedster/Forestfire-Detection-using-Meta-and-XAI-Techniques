@@ -1,0 +1,10 @@
+.venv/
+external/
+.env
+results/cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+pytest-of-*/
+.venv2/
+data/

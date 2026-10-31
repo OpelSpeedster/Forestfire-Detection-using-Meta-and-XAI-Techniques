@@ -1,0 +1,43 @@
+You are my pair-programmer for the Meta Global AI Developer Hackathon (theme: "Push the Frontier"). Submission deadline: Nov 4, 9 PM ET. Today is Oct 31. Feature freeze Nov 3 evening; Nov 4 is for fixes and submission only. Be pragmatic: a working, honest, reproducible core beats an ambitious half-built system.
+
+## Project: "FireNet Cascade"
+A tiered wildfire/smoke detector. A cheap local classifier screens every image/frame. Only uncertain cases escalate to Meta models called live at runtime: first an open-weight model, then a closed API model. The headline contribution is a measured open vs. closed comparison on the classifier's weakest class (smoke), reporting accuracy, per-class recall, cost, and latency.
+
+## Hard rules (never break; if a task conflicts, stop and tell me)
+1. FRESH repo. Create with plain `git init` (no fork, no template, no history import). Do not copy any code, notebooks, images, videos, datasets, or git history from my old repo (github.com/OpelSpeedster/Forest-Fire-Detection-Using-FirenetCNN-and-XAI-Techniques). Everything here must be written new in this session. Every commit message and the README must make this week's work identifiable.
+2. The old project is an external dependency only: its trained Keras weights `FirenetCNN1.h5`. The setup script downloads them into ./external/ (gitignored); path configurable via FIRENET_WEIGHTS. Never commit weights, datasets, or large media. I am confirming with the organizers that fetching weights at setup is allowed. If they say no, replace it with training a small fresh baseline (new code).
+3. Meta models must be called at RUNTIME in the live demo path, not only in offline evaluation.
+4. No invented facts. Every number in the README must be produced by a script in this repo. If the cascade does not beat the baseline, report that honestly.
+5. Do not guess API shapes or model IDs. Before writing any Meta API code, read the current official docs (dev.meta.ai, Meta Model API reference) and report what you found: base URL, model IDs for Muse Spark 1.3 and for SAM 3.1, image input format, JSON/structured output support, rate limits, pricing. Also check how Muse Glimmer is hosted (Fireworks/Baseten/Modal or local) and its exact model ID.
+6. Secrets only via .env (provide .env.example). Never log keys.
+7. Evaluate only on REAL test images. Synthetic images (if ever used) are never part of the test set.
+
+## First, ask me for (do not assume)
+- Dataset location (expected layout test/{fire,nofire,smoke}) and its license/provenance
+- Classifier contract, in my words: input size <INPUT_SIZE>, preprocessing <PREPROCESS>, class order <CLASS_ORDER>
+- META_API_KEY availability, and my Glimmer hosting choice + credentials; my GPU (<GPU or none>)
+- Whether TensorFlow/Keras version pinning is needed to load the .h5 (if loading fails, say so; do not silently retrain)
+Then give a short plan and wait for my go.
+
+## Phase 1: Core (must finish by Nov 2)
+1. Scaffold: src/, scripts/, tests/, app/, results/, README.md, requirements.txt (real, pinned), .env.example, .gitignore, LICENSE (MIT).
+2. scripts/setup: install deps, fetch weights to ./external/, print dataset instructions.
+3. Baseline harness: run the local classifier alone on the full test split (~405 images) and compare to my previously reported numbers: accuracy 0.82; fire P0.92/R0.81; no_fire P0.76/R0.98; smoke P0.84/R0.67. Report any discrepancy before continuing.
+4. VLM client (OpenAI-compatible) for Glimmer and Spark: image + fixed classification prompt, strict JSON {label in [fire, smoke, no_fire], confidence 0-1, rationale one sentence}, low temperature, robust parsing with fallback, retries with backoff, concurrency limit, on-disk cache keyed by model+image hash+prompt, token/latency/cost logging, and a hard USD budget guard (default $20) that halts spending.
+5. Strategies on the same test set: (a) local only, (b) Glimmer only, (c) Spark only, (d) local -> Glimmer below a confidence threshold, (e) local -> Spark, (f) local -> Glimmer -> Spark. Sweep thresholds. Report accuracy, per-class P/R/F1 with smoke recall highlighted, escalation rate, latency p50/p95, estimated cost per 1,000 images, with bootstrap 95% CIs (test set is small, so flag differences within noise). Save results/*.json, results/summary.md, and an accuracy-vs-cost plot.
+6. Gradio demo: upload image / short video (sample every N seconds) / webcam. Per frame show which tier decided, label, confidence, latency, cost. Second tab shows the saved comparison table and plot. Add a "human confirms alert" button; never automate real-world actions. Include a clearly labeled cached mode for reliability, but the demo must also have a live mode that makes real Meta model calls.
+7. Tests with a mocked client (no network): JSON parsing, metrics, cache, budget guard, threshold routing.
+Acceptance: clean-clone setup works; one command reproduces results/summary.md.
+
+## Phase 2: SAM 3.1 evidence (only after Phase 1 is committed)
+For images the cascade flags as fire/smoke, request masks via SAM 3.1 using SEPARATE short single-concept prompts (e.g., "smoke", "flames", "burnt area"), never one combined phrase. Draw overlays; for video, compute mask-area fraction per sampled frame and its growth trend (do not rely on persistent IDs for amorphous smoke). Treat masks as qualitative evidence, not ground truth; I will spot-check ~20 images manually and we report that honestly.
+
+## Phase 3: ONE optional add-on (I will tell you which, or skip)
+A) Context tools: the Spark/Glimmer agent calls tools for historical weather (Open-Meteo) and NASA FIRMS hotspots for a user-supplied lat/lon, and must cite tool outputs in its alert draft (human confirms). Evaluate for hallucination by checking claims against tool outputs.
+B) Hard-negative stress test: generate ~60 synthetic hard negatives (fog, dust, sunset, cooking smoke) with Muse Image (verify model ID/pricing in docs), report false-alarm rate per strategy as a separate, clearly labeled synthetic stress test.
+
+## README (written last, from real results)
+Results table at top; 3-sentence description; a "Prior work" section naming the old repo, stating it contributed only the classifier weights, with exact setup steps; run instructions that work from a clean clone; methodology; limitations (small test set, dataset provenance, VLM non-determinism, cost estimates); failure cases; third-party attributions.
+
+## Working style
+Simple, readable code; small commits with clear messages; run tests as you go; after each step, summarize what works, what is risky, and what is next. Stop and ask before any decision that could spend beyond the budget guard or that touches the hard rules.

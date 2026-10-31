@@ -1,0 +1,46 @@
+{
+  "strategy": "local-only",
+  "split": "test",
+  "n": 405,
+  "accuracy": 0.854320987654321,
+  "ci95": [
+    0.8222222222222222,
+    0.8888888888888888
+  ],
+  "per_class": {
+    "smoke": {
+      "precision": 0.8244274809160306,
+      "recall": 0.782608695652174,
+      "f1": 0.8029739776951673
+    },
+    "fire": {
+      "precision": 0.9035087719298246,
+      "recall": 0.8512396694214877,
+      "f1": 0.8765957446808511
+    },
+    "no_fire": {
+      "precision": 0.84375,
+      "recall": 0.9246575342465754,
+      "f1": 0.8823529411764707
+    }
+  },
+  "latency_p50_ms": 246,
+  "latency_p95_ms": 742,
+  "class_order_env": "fire,no_fire,smoke",
+  "expected_baseline": {
+    "accuracy": 0.82,
+    "fire": {
+      "p": 0.92,
+      "r": 0.81
+    },
+    "no_fire": {
+      "p": 0.76,
+      "r": 0.98
+    },
+    "smoke": {
+      "p": 0.84,
+      "r": 0.67
+    }
+  },
+  "note": "If accuracy << 0.82 or fire images predict smoke/no_fire, CLASS_ORDER or preprocessing mismatches the H5 training. Set CLASS_ORDER env or check BGR vs RGB / scaling."
+}
