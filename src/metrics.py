@@ -1,4 +1,9 @@
+def _check_lengths(y_true, y_pred):
+    if len(y_true) != len(y_pred):
+        raise ValueError(f"y_true and y_pred length mismatch: {len(y_true)} != {len(y_pred)}")
+
 def prf1(y_true, y_pred):
+    _check_lengths(y_true, y_pred)
     labels = ["smoke", "fire", "no_fire"]
     out = {}
     for l in labels:
@@ -12,4 +17,5 @@ def prf1(y_true, y_pred):
     return out
 
 def accuracy(y_true, y_pred):
+    _check_lengths(y_true, y_pred)
     return sum(a == b for a, b in zip(y_true, y_pred)) / len(y_true) if y_true else 0

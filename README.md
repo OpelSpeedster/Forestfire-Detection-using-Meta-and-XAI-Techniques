@@ -1,57 +1,53 @@
 # FireNet Cascade — Tiered wildfire/smoke detector
 
-**Status: Phase 1 scaffold — results pending real run. No numbers below are measured; `results/summary.md` will be the source of truth after `scripts/evaluate.py` runs.**
+Local 224x224 RGB classifier screens every image; uncertain cases escalate live to Glimmer via Fireworks, then Spark closed API. SAM evidence comes from a local Ultralytics model. Headline so far is an honest local-only baseline on the real 405-image test split; the open-vs-closed comparison on smoke runs once API creds are set.
 
-## Results (from `results/summary.md` — replace this table after real evaluation)
-| Strategy | Accuracy | smoke R | Cost/1k | Escalation |
-|---|---:|---:|---:|---:|
-| local | — | — | — | — |
-| glimmer-only | — | — | — | — |
-| spark-only | — | — | — | — |
-| local→glimmer | — | — | — | — |
-| local→spark | — | — | — | — |
-| local→glimmer→spark | — | — | — | — |
+## Results (from `results/summary.md`, produced by `scripts/evaluate.py`)
 
-## Description
-Cheap local 224x224 RGB classifier screens every image. Only uncertain cases escalate live to Meta models: Glimmer on Modal first, then Spark closed API. Measured open vs closed comparison on the weakest class (smoke) — accuracy, per-class recall, cost, latency.
+Local-only, split=test, N=405, accuracy=0.854 95% CI [0.822,0.889], latency p50=246ms p95=742ms.
+
+| class | precision | recall | f1 |
+|---|---|---|---|
+| smoke | 0.824 | 0.783 | 0.803 |
+| fire | 0.904 | 0.851 | 0.877 |
+| no_fire | 0.844 | 0.925 | 0.882 |
+
+Prior work reported acc 0.82; fire P0.92/R0.81; no_fire P0.76/R0.98; smoke P0.84/R0.67. We report the gap honestly: accuracy slightly above, smoke recall below the old smoke precision claim. VLM strategies (Glimmer-only, Spark-only, cascades) are pending live creds — `VLMClient` refuses placeholder labels instead of inventing them.
 
 ## Prior work
-Old repo `github.com/OpelSpeedster/Forest-Fire-Detection-Using-FirenetCNN-and-XAI-Techniques` contributed only the trained weights `FirenetCNN1.h5`. This project is fresh (`git init`), all code new in this session. Weights are fetched at setup into gitignored `external/`; path override `FIRENET_WEIGHTS`.
 
-## Run instructions (clean clone, CPU-only, uv, .venv in project)
+Old repo `github.com/OpelSpeedster/Forest-Fire-Detection-Using-FirenetCNN-and-XAI-Techniques` contributed only the trained weights `FirenetCNN1.h5`. This repo is fresh; all code is new. Weights are fetched at setup into gitignored `external/`; override with `FIRENET_WEIGHTS`. Verified H5 output order is `[fire, no_fire, smoke]` (sweep: 0.887 vs 0.020 for the old order); preprocessing is RGB, 224x224, scale `/255`.
 
-```bash
-uv venv
-uv pip install -r requirements.txt
-cp .env.example .env   # then fill META_API_KEY, MODAL_TOKEN_ID/SECRET, FIREWORKS_API_KEY
-uv run python scripts/setup.py        # fetches weights to external/
-# place test images as data/test/{smoke,fire,no_fire}
-uv run python scripts/evaluate.py     # writes results/results.json, results/summary.md, results/accuracy_cost.png
-uv run python app/demo.py             # Gradio at http://127.0.0.1:7860 (live + labeled cached, human-confirm button)
-uv run pytest -v                      # mocked suite, no network
+## Run instructions (Windows, CPU-only, `.venv` in project)
+
+```bat
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+copy .env.example .env
+REM fill META_API_KEY, SPARK_MODEL, FIREWORKS_API_KEY, GLIMMER_MODEL (exact Fireworks model ID)
+REM optional overrides: GLIMMER_BASE_URL, META_API_BASE, SAM_WEIGHTS, SAM_WEIGHTS_DIR
+.venv\Scripts\python scripts/setup.py
+REM dataset lives at data/forestfire-classifier-dataset/test/{fire,nofire,smoke} (nofire maps to no_fire)
+REM SAM weights (Ultralytics, e.g. sam_b.pt) download once into external/sam on first SAM use
+.venv\Scripts\python -m pytest -v
+.venv\Scripts\python scripts/evaluate.py --split test
+.venv\Scripts\python -m app.demo
 ```
 
-One-command reproduce (after setup):
-```bash
-uv run python scripts/evaluate.py && ls results/summary.md
-```
-
-Verify from clean clone:
-```bash
-rm -rf .venv && uv venv && uv pip install -r requirements.txt && uv run pytest && uv run python scripts/evaluate.py
-```
+One-command reproduce (after setup): `.venv\Scripts\python scripts/evaluate.py --split test`
 
 ## Methodology
-Same ~405-image test set for all 6 strategies; threshold sweep on local confidence; smoke recall highlighted; bootstrap 95% CIs on small test set (flag within-noise diffs). Baseline gate first vs 0.82 / fire P0.92 R0.81 / no_fire P0.76 R0.98 / smoke P0.84 R0.67 — report discrepancy before continuing.
+
+Same test set for every strategy; local confidence threshold sweep; smoke recall highlighted; bootstrap 95% CIs (small test set, flag within-noise diffs). `VLMClient` uses OpenAI-compatible `POST {base}/chat/completions` (base64 image, temperature 0.1, JSON object), retries with backoff, concurrency limit, disk cache by model+image-hash+prompt, $20 budget guard. Docs-first pins: Meta base `https://api.meta.ai/v1`, `muse-spark-1.3`; Glimmer via Fireworks `https://api.fireworks.ai/inference/v1` (not Meta API); SAM local via Ultralytics (`SAM_WEIGHTS=sam_b.pt`) — verify pricing/limits in the dashboards before spending.
 
 ## Limitations
-Small test set; Kaggle-sourced data provenance pending exact page link; VLM non-determinism (low temp + caching); cost estimates from live pricing at run time; CPU-only local inference.
+
+Small test set (405); Kaggle-sourced data provenance needs exact page link; VLM non-determinism (low temp + caching); cost estimates from live pricing; CPU-only local inference (p50 246ms).
 
 ## Failure cases
-VLM strict-JSON parse failures → fallback/retry then abstain; budget guard halts spend at $20; missing weights or corrupt image → error reported, no silent retrain; synthetic images never enter test set.
+
+Missing weights/corrupt image → clear error, no silent retrain; VLM unconfigured → refusal, never a placeholder label; parse failure → retry then abstain; budget guard halts spend; synthetic images never enter the test set.
 
 ## Third-party attributions
-TensorFlow/Keras, Pillow, Gradio, httpx, Modal, Fireworks, Meta API.
 
-## Docs-first
-Before final Meta API code, verify base URL, model IDs for Muse Spark 1.3 and SAM 3.1, image format, JSON support, limits, pricing from dev.meta.ai / Model API reference, and Glimmer hosting ID.
+TensorFlow 2.20 / Keras 3.12, Pillow, Gradio, httpx, Ultralytics (local SAM), Fireworks (Glimmer), Meta Model API (Spark), NASA FIRMS / Open-Meteo only if Phase 3 add-on is chosen.

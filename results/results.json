@@ -4,8 +4,8 @@
   "n": 405,
   "accuracy": 0.854320987654321,
   "ci95": [
-    0.8222222222222222,
-    0.8888888888888888
+    0.8148148148148148,
+    0.891358024691358
   ],
   "per_class": {
     "smoke": {
@@ -24,8 +24,8 @@
       "f1": 0.8823529411764707
     }
   },
-  "latency_p50_ms": 246,
-  "latency_p95_ms": 742,
+  "latency_p50_ms": 355,
+  "latency_p95_ms": 1045,
   "class_order_env": "fire,no_fire,smoke",
   "expected_baseline": {
     "accuracy": 0.82,

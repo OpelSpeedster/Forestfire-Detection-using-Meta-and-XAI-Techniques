@@ -1,7 +1,7 @@
 # Summary (local-only baseline, real run)
 
-N=405 split=test accuracy=0.854 95%CI [0.822,0.889]
-latency p50=246ms p95=742ms
+N=405 split=test accuracy=0.854 95%CI [0.815,0.891]
+latency p50=355ms p95=1045ms
 
 | class | precision | recall | f1 |
 |---|---|---|---|
