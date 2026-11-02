@@ -8,3 +8,4 @@ __pycache__/
 pytest-of-*/
 .venv2/
 data/
+.agents/
